@@ -1,0 +1,28 @@
+- name: Change DNS on Windows Servers
+  hosts: all
+  gather_facts: no
+
+  tasks:
+    - name: Update DNS on interfaces where old DNS is found
+      win_shell: |
+        $OldDNS = @("192.168.100.3", "192.168.100.4")
+        $NewDNS = "192.168.100.5", "192.168.100.6"
+        $Results = @()
+
+        foreach ($nic in Get-DnsClientServerAddress -AddressFamily IPv4) {
+            if ($nic.ServerAddresses | Where-Object { $OldDNS -contains $_ }) {
+                Set-DnsClientServerAddress -InterfaceIndex $nic.InterfaceIndex -ServerAddresses $NewDNS
+                $Results += "$env:COMPUTERNAME: Zmieniono DNS na interfejsie $($nic.InterfaceAlias) na $($NewDNS -join ', ')"
+            }
+            else {
+                $Results += "$env:COMPUTERNAME: Pominieto interfejs $($nic.InterfaceAlias) – stare DNS nie znalezione"
+            }
+        }
+
+        # Wyslij wynik jako tekst (linia po linii)
+        $Results -join "`n"
+      register: dns_result
+
+    - name: Show DNS update result
+      debug:
+        msg: "{{ dns_result.stdout_lines }}"
